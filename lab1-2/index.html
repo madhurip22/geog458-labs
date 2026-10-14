@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+    <meta charset='utf-8' />
+    <title>my First Map</title>
+    <meta name='viewport' content='width=device-width, initial-scale=1' />
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.js"></script>
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+   </style>
+</head>
+<body>
+   <div id='map'></div>
+   <script>
+      mapboxgl.accessToken = 'pk.eyJ1IjoibWFkaHVyaXAyMiIsImEiOiJjbWhlN2gxeWwwN3h3Mm1wd2phaThhdDl6In0.l7OEJPRmT8nlruEAcQFM2A';
+        const mymap = new mapboxgl.Map({ 
+            container: 'map',
+            // style: 'mapbox://styles/mapbox/light-v11',
+            // projection: 'globe',
+            center: [-122.3131, 47.6615],
+            zoom: 15.5
+        });
+        
+// code from the next step will go here!
+// Adds fullscreen button
+mymap.addControl(new mapboxgl.FullscreenControl());
+ // Adds zoom buttons and compass
+mymap.addControl(new mapboxgl.NavigationControl());
+// Runs after the style loads, so the settings below work
+mymap.on('style.load', () => {
+    // Dusk lighting
+    mymap.setConfigProperty('basemap', 'lightPreset', 'dusk');
+    // Hides POI labels
+    mymap.setConfigProperty('basemap', 'showPointOfInterestLabels', false);
+
+    // Extra 1: monochrome
+    // Changed the theme from default to monochrome. Map turns into shades
+    // of one color, so it looks less busy. Useful when adding own data
+    // on top, so data stands out more/
+    mymap.setConfigProperty('basemap', 'theme', 'monochrome');
+
+    // Extra 2: Montserrat font for labels
+    // Cleaner to look at overall and more readable.
+    mymap.setConfigProperty('basemap', 'font', 'Montserrat');
+});
+</script>
+      /*
+</script>
+</body>
+</html>
