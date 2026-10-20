@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>10 Most Populated Cities</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.6.0/mapbox-gl.js"></script>
+<style>
+body { margin: 0; padding: 0; font-family: sans-serif; }
+#map { position: absolute; top: 0; bottom: 0; width: 100%; }
+
+#title {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fff;
+    padding: 8px 16px;
+    border-radius: 3px;
+    font-size: 18px;
+    font-weight: bold;
+}
+
+#legend {
+    position: absolute;
+    bottom: 40px;
+    right: 20px;
+    background: #fff;
+    padding: 10px 15px;
+    border-radius: 3px;
+    font-size: 13px;
+}
+
+.dot {
+    display: inline-block;
+    border-radius: 50%;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="title">The 10 Most Populated Cities in the World</div>
+
+<div id="legend">
+    <strong>City population</strong><br>
+    <p><i class="dot" style="background:#ff7a00; width:24px; height:24px;"></i>Top 10 (10 million+)</p>
+    <p><i class="dot" style="background:#6c7a96; width:3px; height:3px;"></i>All other cities</p>
+    <span style="font-size:10pt;">Source: Natural Earth</span>
+</div>
+
+<script>
+mapboxgl.accessToken = 'pk.eyJ1IjoibWFkaHVyaXAyMiIsImEiOiJjbWhlN2gxeWwwN3h3Mm1wd2phaThhdDl6In0.l7OEJPRmT8nlruEAcQFM2A';
+
+const mymap = new mapboxgl.Map({
+    container: 'map',
+    style: 'mapbox://styles/mapbox/dark-v11',
+    center: [40, 30],
+    zoom: 1.5
+});
+
+mymap.on('load', () => {
+    mymap.addSource('population', {
+        type: 'geojson',
+        data: 'data/world-cities.geojson'
+    });
+
+    mymap.addLayer({
+        id: 'population-layer',
+        type: 'circle',
+        source: 'population',
+        paint: {
+            // one break at 10 million, only 10 cities are over it so it's the top 10
+            // most cities are tiny so more classes wouldn't show much
+            'circle-radius': ['step', ['get', 'population'], 1.5, 10000000, 12],
+
+            // orange for the top 10 so they pop, gray-blue for the rest
+            'circle-color': ['step', ['get', 'population'], '#6c7a96', 10000000, '#ff7a00'],
+
+            'circle-stroke-width': 0.5,
+            'circle-stroke-color': 'white'
+        }
+    });
+
+    mymap.on('click', 'population-layer', (event) => {
+        const feature = event.features[0];
+        const coordinates = feature.geometry.coordinates.slice(0, 2);
+
+        new mapboxgl.Popup()
+            .setLngLat(coordinates)
+            .setHTML(
+                '<strong>' + feature.properties.accentcity + '</strong><br>' +
+                'Population: ' + feature.properties.population.toLocaleString()
+            )
+            .addTo(mymap);
+    });
+});
+</script>
+</body>
+</html>
