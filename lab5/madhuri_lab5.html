@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Bainbridge Island–Seattle Vessel Traffic</title>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.js"></script>
+  <script src="https://unpkg.com/deck.gl@9.0.38/dist.min.js"></script>
+  <style>
+    body { margin: 0; }
+    #map { position: absolute; width: 100%; height: 100%; }
+    #panel { position: absolute; top: 10px; left: 10px; width: 260px; padding: 10px; background: white; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <div id="panel">
+    <h3>Bainbridge Island–Seattle Vessel Traffic</h3>
+    <p id="status"></p>
+
+    <label for="vessel-type">Vessel type</label>
+    <select id="vessel-type">
+      <option value="passenger" selected>Passenger</option>
+      <option value="tanker">Tanker</option>
+      <option value="cargo">Cargo</option>
+      <option value="other">Other vessels</option>
+    </select>
+
+    <button id="play-stop" type="button" aria-pressed="true">Stop</button>
+    <p>Data time: <time id="time-display">Loading date/time...</time></p>
+    <label for="time-slider">Data time (Seattle: PDT/PST)</label>
+    <input id="time-slider" type="range" min="0" max="1" value="0" step="1" disabled
+      style="display:block;width:100%;margin:8px 0;accent-color:#fd805d;">
+  </div>
+
+  <script>
+    mapboxgl.accessToken = 'pk.eyJ1IjoibWFkaHVyaXAyMiIsImEiOiJjbWhlN2gxeWwwN3h3Mm1wd2phaThhdDl6In0.l7OEJPRmT8nlruEAcQFM2A';
+
+    const map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/dark-v11',
+      center: [-122.46, 47.60],
+      zoom: 11
+    });
+
+    const overlay = new deck.MapboxOverlay({ layers: [] });
+    map.addControl(overlay);
+
+    const status = document.getElementById('status');
+
+    async function main() {
+      const response = await fetch('./ais_trips.json');
+      const data = await response.json();
+      const trips = data.filter(d => d.path.length >= 2);
+
+      const startTime = Math.min(...trips.map(d => d.timestamps[0]));
+      const endTime = Math.max(...trips.map(d => d.timestamps[d.timestamps.length - 1])) + 3600;
+      let currentTime = startTime + 3600;
+      let displayedTrips = trips;
+      let playing = true;
+      let previousFrame = null;
+
+      const metadataResponse = await fetch('./ais_trips_metadata.json');
+      if (!metadataResponse.ok) throw new Error('Could not load ais_trips_metadata.json.');
+      const metadata = await metadataResponse.json();
+      const timeOrigin = Date.parse(metadata.time_origin_utc);
+      if (!Number.isFinite(timeOrigin)) throw new Error('Invalid time_origin_utc in ais_trips_metadata.json.');
+      const timeDisplay = document.getElementById('time-display');
+      const timeSlider = document.getElementById('time-slider');
+      timeSlider.min = String(startTime);
+      timeSlider.max = String(endTime);
+      timeSlider.disabled = false;
+      const timeFormatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Los_Angeles',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hourCycle: 'h23', timeZoneName: 'short'
+      });
+
+      function updateTimeUI() {
+        const date = new Date(timeOrigin + Math.floor(currentTime) * 1000);
+        timeDisplay.dateTime = date.toISOString();
+        timeDisplay.textContent = timeFormatter.format(date);
+        timeSlider.value = String(Math.floor(currentTime));
+        timeSlider.setAttribute('aria-valuetext', timeDisplay.textContent);
+      }
+
+      function draw() {
+        overlay.setProps({
+          layers: [
+            new deck.TripsLayer({
+              id: 'trips',
+              data: displayedTrips,
+              getPath: d => d.path,
+              getTimestamps: d => d.timestamps,
+              getColor: [253, 128, 93],
+              widthMinPixels: 2,
+              trailLength: 3600,
+              currentTime
+            })
+          ]
+        });
+        updateTimeUI();
+      }
+
+      const vesselType = document.getElementById('vessel-type');
+
+      function applyFilter() {
+        displayedTrips = trips.filter(d => {
+          const type = Number(d.type);
+          if (vesselType.value === 'passenger') return type >= 60 && type < 70;
+          if (vesselType.value === 'tanker') return type >= 80 && type < 90;
+          if (vesselType.value === 'cargo') return type >= 70 && type < 80;
+          return !(type >= 60 && type < 90);
+        });
+        status.textContent = `${displayedTrips.length} paths selected`;
+        draw();
+      }
+
+      vesselType.addEventListener('change', applyFilter);
+      applyFilter(); // Apply the default Passenger selection immediately.
+
+      const playStop = document.getElementById('play-stop');
+
+      function setPlaying(value) {
+        playing = value;
+        previousFrame = null;
+        playStop.textContent = playing ? 'Stop' : 'Play';
+        playStop.setAttribute('aria-pressed', String(playing));
+      }
+
+      playStop.addEventListener('click', () => setPlaying(!playing));
+
+      timeSlider.addEventListener('input', () => {
+        setPlaying(false);
+        currentTime = Number(timeSlider.value);
+        draw();
+      });
+
+      function animate(now) {
+        if (playing && previousFrame !== null) {
+          currentTime += (now - previousFrame) / 1000 * 900;
+          draw();
+        }
+        previousFrame = now;
+        requestAnimationFrame(animate);
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    main();
+  </script>
+</body>
+</html>
